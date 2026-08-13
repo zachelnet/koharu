@@ -121,7 +121,7 @@ impl DiscoverablePackage for Llama {
             }
             None
         } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-            hardware.supports_vulkan().then_some(Self::LinuxVulkan)
+            hardware.has_vulkan().then_some(Self::LinuxVulkan)
         } else if hardware.supports_metal() {
             Some(Self::MacosMetal)
         } else {
