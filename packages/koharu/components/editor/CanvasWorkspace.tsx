@@ -183,6 +183,18 @@ export function CanvasWorkspace() {
     }
   }, [report])
 
+  useEffect(() => {
+    // Chromium treats Ctrl/Cmd+wheel as page zoom. Koharu keeps the browser
+    // viewport fixed and zooms only the canvas, so swallow the native gesture
+    // in the capture phase (React's wheel listener is passive and cannot
+    // prevent the browser default).
+    const preventPageZoom = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) event.preventDefault()
+    }
+    window.addEventListener('wheel', preventPageZoom, { passive: false, capture: true })
+    return () => window.removeEventListener('wheel', preventPageZoom, { capture: true })
+  }, [])
+
   useEffect(() => cancelGesture, [cancelGesture, page?.id, tool])
 
   useEffect(() => {
