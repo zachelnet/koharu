@@ -175,6 +175,17 @@ impl Hardware {
             .is_some_and(|device| device.backend == Backend::Vulkan)
     }
 
+    /// Whether any discovered device exposes Vulkan, regardless of the
+    /// accelerator selected for torch. llama.cpp and stable-diffusion.cpp run
+    /// their Vulkan backends independently of the torch device, so a Vulkan
+    /// device can back them even when ROCm is selected for torch inference.
+    #[must_use]
+    pub fn has_vulkan(&self) -> bool {
+        self.devices
+            .iter()
+            .any(|device| device.backend == Backend::Vulkan)
+    }
+
     #[must_use]
     pub fn supports_metal(&self) -> bool {
         self.device()
