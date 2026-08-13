@@ -51,6 +51,13 @@ enum Backend {
         )
     )]
     Rocm714(Rocm),
+    #[strum(
+        serialize = "rocm",
+        props(
+            linux = "libc10.so,libc10_hip.so,libshm.so,libtorch_global_deps.so,libtorch_cpu.so,libtorch_hip.so,libtorch.so"
+        )
+    )]
+    RocmLinux(u32, u32),
 }
 
 impl Torch {
@@ -92,7 +99,7 @@ impl Torch {
     fn selected_rocm(self) -> Option<Rocm> {
         match self.0 {
             Backend::Rocm714(target) => Some(target),
-            Backend::Cpu | Backend::Cuda13 => None,
+            Backend::Cpu | Backend::Cuda13 | Backend::RocmLinux(..) => None,
         }
     }
 
@@ -120,11 +127,16 @@ impl Torch {
             }
             return Ok(urls);
         }
+        if let Backend::RocmLinux(major, minor) = self.0 {
+            return Ok(vec![format!(
+                "https://download.pytorch.org/libtorch/rocm{major}.{minor}/libtorch-shared-with-deps-{ROCM_TORCH_VERSION}%2Brocm{major}.{minor}.zip"
+            )]);
+        }
 
         let backend = match self.0 {
             Backend::Cpu => "cpu",
             Backend::Cuda13 => "cu130",
-            Backend::Rocm714(_) => unreachable!(),
+            Backend::Rocm714(_) | Backend::RocmLinux(..) => unreachable!(),
         };
         if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
             Ok(vec![format!(
@@ -148,11 +160,14 @@ impl Torch {
 
 impl fmt::Display for Torch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self.0 {
-            Backend::Cpu => "cpu",
-            Backend::Cuda13 => "cuda-13",
-            Backend::Rocm714(_) => "rocm-7.14",
-        })
+        match self.0 {
+            Backend::Cpu => formatter.write_str("cpu"),
+            Backend::Cuda13 => formatter.write_str("cuda-13"),
+            Backend::Rocm714(_) => formatter.write_str("rocm-7.14"),
+            Backend::RocmLinux(major, minor) => {
+                write!(formatter, "rocm-{major}.{minor}-linux")
+            }
+        }
     }
 }
 
@@ -161,10 +176,12 @@ impl sealed::Sealed for Torch {}
 impl Package for Torch {
     async fn install(self) -> Result<PathBuf> {
         let rocm = self.selected_rocm();
-        let version = if matches!(self.0, Backend::Rocm714(_)) {
-            format!("{ROCM_TORCH_VERSION}+rocm{}", rocm::VERSION)
-        } else {
-            VERSION.to_owned()
+        let version = match self.0 {
+            Backend::Rocm714(_) => format!("{ROCM_TORCH_VERSION}+rocm{}", rocm::VERSION),
+            Backend::RocmLinux(major, minor) => {
+                format!("{ROCM_TORCH_VERSION}+rocm{major}.{minor}")
+            }
+            Backend::Cpu | Backend::Cuda13 => VERSION.to_owned(),
         };
         let target = Store::root()
             .join("torch")
@@ -176,7 +193,18 @@ impl Package for Torch {
             .iter()
             .map(|name| format!("torch/lib/{name}"))
             .collect::<Vec<_>>();
-        if rocm.is_some() {
+        if matches!(self.0, Backend::RocmLinux(..)) {
+            // The ROCm libtorch build ships GPU kernel data next to the
+            // libraries (rocBLAS/hipBLASLt/hipSPARSELt Tensile libraries and
+            // the AOTriton JIT images). Extracting only the `.so` files would
+            // leave these out, so rocBLAS aborts on the first GEMM ("Could not
+            // initialize Tensile host"). Extract the whole `libtorch/lib` tree.
+            patterns = vec![
+                "libtorch/lib/**/*".to_owned(),
+                "libtorch/lib/*.so".to_owned(),
+                "libtorch/lib/*.so.*".to_owned(),
+            ];
+        } else if rocm.is_some() {
             patterns.extend([
                 "torch/.kpack/**/*".to_owned(),
                 "torch/lib/aotriton.images/**/*".to_owned(),
@@ -196,11 +224,19 @@ impl Package for Torch {
                 let transfer = Transfer::new()?;
                 let patterns = patterns.iter().map(String::as_str).collect::<Vec<_>>();
                 for url in urls {
-                    let archive = tempfile::Builder::new().suffix(".whl").tempfile()?;
+                    let archive = if matches!(self.0, Backend::RocmLinux(..)) {
+                        tempfile::Builder::new().suffix(".zip").tempfile()?
+                    } else {
+                        tempfile::Builder::new().suffix(".whl").tempfile()?
+                    };
                     transfer.fetch(&url, archive.path()).await?;
                     extract(archive.path(), &stage, &patterns)?;
                 }
-                std::fs::rename(stage.join("torch"), stage.join("libtorch"))?;
+                if !matches!(self.0, Backend::RocmLinux(..)) {
+                    std::fs::rename(stage.join("torch"), stage.join("libtorch"))?;
+                }
+                #[cfg(target_os = "linux")]
+                crate::source::fix_load_alignment(&stage.join("libtorch/lib"))?;
                 Ok(())
             },
         )
@@ -222,15 +258,16 @@ impl DiscoverablePackage for Torch {
         if hardware.supports_cuda() {
             return Some(Self(Backend::Cuda13));
         }
-        if hardware.supports_rocm() {
-            return if cfg!(target_os = "windows") {
-                Rocm::discover(hardware)
-                    .ok()
-                    .map(Backend::Rocm714)
-                    .map(Self)
-            } else {
-                None
-            };
+        if cfg!(target_os = "windows")
+            && let Ok(target) = Rocm::discover(hardware)
+        {
+            return Some(Self(Backend::Rocm714(target)));
+        }
+        if cfg!(target_os = "linux")
+            && hardware.supports_rocm()
+            && let Some((major, minor)) = hardware.rocm_version()
+        {
+            return Some(Self(Backend::RocmLinux(major, minor)));
         }
         tracing::warn!("no supported Torch accelerator was discovered; using CPU");
         Some(Self::CPU)
@@ -242,7 +279,7 @@ impl RuntimePackage for Torch {
 
     fn dependencies(self, _hardware: &Hardware) -> Result<Vec<Component>> {
         match self.0 {
-            Backend::Cpu => Ok(Vec::new()),
+            Backend::Cpu | Backend::RocmLinux(..) => Ok(Vec::new()),
             Backend::Rocm714(target) => Ok(vec![Component::Rocm(target)]),
             Backend::Cuda13 => {
                 let packages = [

@@ -12,6 +12,7 @@ pub struct Hardware {
     pub(crate) devices: Vec<Device>,
     pub(crate) candidates: Vec<usize>,
     pub(crate) selected: Option<usize>,
+    pub(crate) rocm_version: Option<(u32, u32)>,
 }
 
 impl Hardware {
@@ -25,7 +26,8 @@ impl Hardware {
         let (cuda_driver, mut devices) = cuda::probe()
             .map(|(driver, devices)| (Some(driver), devices))
             .unwrap_or_default();
-        devices.extend(hip::probe());
+        let (rocm_version, hip_devices) = hip::probe();
+        devices.extend(hip_devices);
         let vulkan = vulkan::probe();
         if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
             devices.push(Device {
@@ -105,6 +107,7 @@ impl Hardware {
             devices,
             candidates,
             selected,
+            rocm_version,
         }
     }
 
@@ -158,6 +161,12 @@ impl Hardware {
         self.device()
             .filter(|device| device.backend == Backend::Rocm)
             .and_then(Device::target)
+    }
+
+    /// The system ROCm version (major, minor) reported by the HIP runtime.
+    #[must_use]
+    pub(crate) fn rocm_version(&self) -> Option<(u32, u32)> {
+        self.rocm_version
     }
 
     #[must_use]

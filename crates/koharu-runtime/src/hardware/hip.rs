@@ -9,11 +9,12 @@ type GetDeviceProperties = unsafe extern "C" fn(*mut c_void, i32) -> i32;
 type GetDeviceAttribute = unsafe extern "C" fn(*mut i32, i32, i32) -> i32;
 type GetDeviceName = unsafe extern "C" fn(*mut c_char, i32, i32) -> i32;
 type GetDeviceMemory = unsafe extern "C" fn(*mut usize, i32) -> i32;
+type GetRuntimeVersion = unsafe extern "C" fn(*mut i32) -> i32;
 
 #[repr(C, align(64))]
 struct Properties([u8; 64 * 1024]);
 
-pub(super) fn probe() -> Vec<Device> {
+pub(super) fn probe() -> (Option<(u32, u32)>, Vec<Device>) {
     let names: &[&str] = if cfg!(target_os = "windows") {
         &["amdhip64.dll", "amdhip64_6.dll", "amdhip64_7.dll"]
     } else if cfg!(target_os = "linux") {
@@ -25,31 +26,43 @@ pub(super) fn probe() -> Vec<Device> {
         .iter()
         .find_map(|name| unsafe { Library::new(name).ok() })
     else {
-        return Vec::new();
+        return (None, Vec::new());
     };
     unsafe {
+        let version = library
+            .get::<GetRuntimeVersion>(b"hipRuntimeGetVersion\0")
+            .ok()
+            .and_then(|get_runtime_version| {
+                let mut version = 0;
+                (get_runtime_version(&mut version) == 0 && version > 0).then(|| {
+                    (
+                        (version / 10_000_000) as u32,
+                        (version / 100_000 % 100) as u32,
+                    )
+                })
+            });
         let Ok(get_device_count) = library.get::<GetDeviceCount>(b"hipGetDeviceCount\0") else {
-            return Vec::new();
+            return (version, Vec::new());
         };
         let Ok(get_device_properties) =
             library.get::<GetDeviceProperties>(b"hipGetDeviceProperties\0")
         else {
-            return Vec::new();
+            return (version, Vec::new());
         };
         let Ok(get_device_attribute) =
             library.get::<GetDeviceAttribute>(b"hipDeviceGetAttribute\0")
         else {
-            return Vec::new();
+            return (version, Vec::new());
         };
         let Ok(get_device_name) = library.get::<GetDeviceName>(b"hipDeviceGetName\0") else {
-            return Vec::new();
+            return (version, Vec::new());
         };
         let Ok(get_device_memory) = library.get::<GetDeviceMemory>(b"hipDeviceTotalMem\0") else {
-            return Vec::new();
+            return (version, Vec::new());
         };
         let mut count = 0;
         if get_device_count(&mut count) != 0 || count <= 0 {
-            return Vec::new();
+            return (version, Vec::new());
         }
 
         let mut devices = Vec::new();
@@ -91,7 +104,7 @@ pub(super) fn probe() -> Vec<Device> {
                 target: Some(target),
             });
         }
-        devices
+        (version, devices)
     }
 }
 

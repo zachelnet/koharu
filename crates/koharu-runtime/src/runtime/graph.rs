@@ -178,6 +178,7 @@ mod tests {
             }],
             candidates: vec![0],
             selected: Some(0),
+            rocm_version: None,
         };
         let mut plan = Plan::default();
         let llama = plan.insert(Llama::WindowsCuda.into(), &hardware).unwrap();
