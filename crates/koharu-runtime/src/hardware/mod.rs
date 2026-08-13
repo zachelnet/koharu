@@ -169,6 +169,16 @@ impl Hardware {
         self.rocm_version
     }
 
+    /// True on RDNA3+ (gfx11/12) and CDNA2+ (gfx90a/gfx908); older targets use FP32.
+    #[must_use]
+    pub fn rocm_supports_bf16(&self) -> bool {
+        let Some(target) = self.rocm_target() else {
+            return false;
+        };
+        let arch = target.strip_prefix("gfx").unwrap_or(target);
+        matches!(arch, "908" | "90a") || arch.starts_with("11") || arch.starts_with("12")
+    }
+
     #[must_use]
     pub fn supports_vulkan(&self) -> bool {
         self.device()
@@ -195,6 +205,46 @@ impl Hardware {
 
 #[cfg(test)]
 mod tests {
+    fn hardware_with_rocm(target: &str) -> super::Hardware {
+        super::Hardware {
+            devices: vec![crate::Device {
+                index: 0,
+                name: "ROCm0".to_owned(),
+                description: target.to_owned(),
+                backend: crate::Backend::Rocm,
+                device_type: crate::DeviceType::Gpu,
+                memory_total: 0,
+                memory_free: 0,
+                compute_capability: 0,
+                target: Some(target.to_owned()),
+            }],
+            candidates: vec![],
+            selected: Some(0),
+            rocm_version: None,
+        }
+    }
+
+    #[test]
+    fn rocm_bf16_support_tracks_gfx_generation() {
+        for (target, expected) in [
+            ("gfx1201", true),
+            ("gfx1100", true),
+            ("gfx1151", true),
+            ("gfx90a", true),
+            ("gfx908", true),
+            ("gfx1030", false),
+            ("gfx1010", false),
+            ("gfx906", false),
+            ("gfx803", false),
+        ] {
+            assert_eq!(
+                hardware_with_rocm(target).rocm_supports_bf16(),
+                expected,
+                "target {target}"
+            );
+        }
+    }
+
     #[test]
     fn discovery_is_safe_without_accelerators() {
         let _ = super::Hardware::discover();

@@ -38,8 +38,16 @@ impl TryIntoDevice<koharu_torch::Device> for Device {
 
 pub(crate) fn set_precision(var_store: &mut nn::VarStore) {
     let device = var_store.device();
+    let hardware = Hardware::discover();
     let kind = if let koharu_torch::Device::Cuda(_) = device {
-        if Hardware::discover().cuda_compute_capability() >= 80 {
+        // ROCm: FP16 overflows and corrupts output.
+        if hardware.supports_rocm() {
+            if hardware.rocm_supports_bf16() {
+                Kind::BFloat16
+            } else {
+                Kind::Float
+            }
+        } else if hardware.cuda_compute_capability() >= 80 {
             Kind::BFloat16
         } else {
             Kind::Half
