@@ -263,9 +263,21 @@ fn print_span(
     let dur_s = ds.apply_to(format!("{:>w$}", fmt_dur(duration), w = DUR_W));
     let pct_s = style(format!("{:>4.0}%", ratio * 100.0)).dim();
 
-    eprintln!("{g}{styled_label}{fill}{bar} {dur_s} {pct_s}");
+    stderr_line(format_args!("{g}{styled_label}{fill}{bar} {dur_s} {pct_s}"));
 
     print_tree(children, root_dur, depth + 1);
+}
+
+/// Writes a line to stderr without panicking when the output is a full or
+/// non-blocking pipe (e.g. under a process runner that sets `O_NONBLOCK`).
+/// The presentation layer must never take down the application just because
+/// the terminal cannot keep up, so write errors are dropped instead of
+/// raising the `failed printing to stderr` panic.
+fn stderr_line(args: std::fmt::Arguments<'_>) {
+    use std::io::Write as _;
+    let mut stderr = std::io::stderr();
+    let _ = stderr.write_fmt(args);
+    let _ = stderr.write_all(b"\n");
 }
 
 fn print_event(level: &Level, message: &str, depth: usize) {
@@ -276,7 +288,7 @@ fn print_event(level: &Level, message: &str, depth: usize) {
         Level::INFO => style("ℹ").cyan(),
         _ => style("·").dim(),
     };
-    eprintln!("{g}{icon} {}", style(message).dim());
+    stderr_line(format_args!("{g}{icon} {}", style(message).dim()));
 }
 
 fn print_tree(nodes: &[Node], root_dur: Duration, depth: usize) {
@@ -307,7 +319,7 @@ fn print_root(node: &Node) {
             children,
             ..
         } => {
-            eprintln!();
+            stderr_line(format_args!(""));
             print_span(
                 name,
                 fields,

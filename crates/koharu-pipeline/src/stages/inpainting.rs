@@ -307,8 +307,14 @@ impl Model {
         let width = overlay.width();
         let height = overlay.height();
         DynamicImage::ImageRgba8(overlay).write_to(&mut bytes, ImageFormat::Png)?;
-        let cleanup_entity = if let Some(entity) = cleanup_entity {
-            if manual {
+        // Reuse the page's cleanup layer only when the edit is allowed to write
+        // into it. Manual inpainting may take over (and promote) any existing
+        // cleanup layer, because the user is explicitly editing it. The automatic
+        // pipeline may only overwrite a cleanup layer it generated itself; a
+        // user-owned (or foreign) layer is protected by the authorship guard, so
+        // this run's result goes into a fresh generated layer instead of failing.
+        let cleanup_entity = match cleanup_entity {
+            Some(entity) if manual => {
                 let mut layer = input
                     .scene
                     .component::<RasterLayer>(entity)?
@@ -323,19 +329,30 @@ impl Model {
                     layer.origin = Origin::User;
                     edit.set(entity, &layer)?;
                 }
+                entity
             }
-            entity
-        } else {
-            let entity = edit.add_entity(page, At::Start)?;
-            edit.set(
-                entity,
-                &RasterLayer {
-                    origin: Origin::User,
-                    name: "Cleanup".to_owned(),
-                    kind: RasterLayerKind::Cleanup,
-                },
-            )?;
-            entity
+            Some(entity)
+                if input
+                    .scene
+                    .component::<EntityOrigin>(entity)?
+                    .is_some_and(|origin| {
+                        matches!(&origin.origin, Origin::Generated(owner) if owner.producer.as_str() == PRODUCER)
+                    }) =>
+            {
+                entity
+            }
+            _ => {
+                let entity = edit.add_entity(page, At::Start)?;
+                edit.set(
+                    entity,
+                    &RasterLayer {
+                        origin: Origin::User,
+                        name: "Cleanup".to_owned(),
+                        kind: RasterLayerKind::Cleanup,
+                    },
+                )?;
+                entity
+            }
         };
         edit.set_asset(
             cleanup_entity,
