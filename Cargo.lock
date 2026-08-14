@@ -4334,7 +4334,7 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
 name = "koharu"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "clap",
  "console",
@@ -4352,11 +4352,12 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "windows 0.62.2",
 ]
 
 [[package]]
 name = "koharu-agent"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4377,7 +4378,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-app"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "alphanumeric-sort",
  "anyhow",
@@ -4424,7 +4425,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-bindgen"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "bindgen",
@@ -4437,7 +4438,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-canvas"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "criterion",
  "image 0.25.10",
@@ -4451,7 +4452,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-config"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "atomicwrites",
@@ -4465,7 +4466,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-desktop"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "koharu-canvas",
@@ -4482,7 +4483,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-diffusion"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "image 0.25.10",
  "koharu-diffusion-sys",
@@ -4492,7 +4493,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-diffusion-sys"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "koharu-bindgen",
@@ -4502,7 +4503,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-llama"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "encoding_rs",
  "enumflags2",
@@ -4517,7 +4518,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-llama-sys"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "koharu-bindgen",
@@ -4527,7 +4528,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-ml"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "ab_glyph",
  "anyhow",
@@ -4558,7 +4559,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-pipeline"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -4574,6 +4575,7 @@ dependencies = [
  "koharu-scene",
  "koharu-translator",
  "nvml-wrapper",
+ "rayon",
  "reqwest",
  "serde",
  "specta",
@@ -4587,7 +4589,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-psd"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "image 0.25.10",
  "koharu-renderer",
@@ -4599,7 +4601,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-renderer"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -4634,7 +4636,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-runtime"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "dirs",
@@ -4662,7 +4664,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-scene"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "blake3",
  "bytes",
@@ -4684,7 +4686,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-secrets"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "keyring",
@@ -4696,7 +4698,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-storage"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "blake3",
  "bytes",
@@ -4716,7 +4718,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-torch"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "half",
@@ -4733,7 +4735,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-torch-sys"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "cmake",
@@ -4746,7 +4748,7 @@ dependencies = [
 
 [[package]]
 name = "koharu-translator"
-version = "0.66.9"
+version = "0.66.10"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -8766,7 +8768,7 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 [[package]]
 name = "tauri"
 version = "2.11.5"
-source = "git+https://github.com/mayocream/tauri?rev=023753b7dd8982cf0dbe71b788b2e0b60770e0af#023753b7dd8982cf0dbe71b788b2e0b60770e0af"
+source = "git+https://github.com/mayocream/tauri?rev=2908dbbbb7ea0c9aaf30a0e33c819a7eba092278#2908dbbbb7ea0c9aaf30a0e33c819a7eba092278"
 dependencies = [
  "anyhow",
  "bytes",
@@ -8817,7 +8819,7 @@ dependencies = [
 [[package]]
 name = "tauri-build"
 version = "2.6.3"
-source = "git+https://github.com/mayocream/tauri?rev=023753b7dd8982cf0dbe71b788b2e0b60770e0af#023753b7dd8982cf0dbe71b788b2e0b60770e0af"
+source = "git+https://github.com/mayocream/tauri?rev=2908dbbbb7ea0c9aaf30a0e33c819a7eba092278#2908dbbbb7ea0c9aaf30a0e33c819a7eba092278"
 dependencies = [
  "anyhow",
  "cargo_toml",
@@ -8837,7 +8839,7 @@ dependencies = [
 [[package]]
 name = "tauri-codegen"
 version = "2.6.3"
-source = "git+https://github.com/mayocream/tauri?rev=023753b7dd8982cf0dbe71b788b2e0b60770e0af#023753b7dd8982cf0dbe71b788b2e0b60770e0af"
+source = "git+https://github.com/mayocream/tauri?rev=2908dbbbb7ea0c9aaf30a0e33c819a7eba092278#2908dbbbb7ea0c9aaf30a0e33c819a7eba092278"
 dependencies = [
  "base64 0.22.1",
  "brotli",
@@ -8863,7 +8865,7 @@ dependencies = [
 [[package]]
 name = "tauri-macros"
 version = "2.6.3"
-source = "git+https://github.com/mayocream/tauri?rev=023753b7dd8982cf0dbe71b788b2e0b60770e0af#023753b7dd8982cf0dbe71b788b2e0b60770e0af"
+source = "git+https://github.com/mayocream/tauri?rev=2908dbbbb7ea0c9aaf30a0e33c819a7eba092278#2908dbbbb7ea0c9aaf30a0e33c819a7eba092278"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -8876,7 +8878,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin"
 version = "2.6.3"
-source = "git+https://github.com/mayocream/tauri?rev=023753b7dd8982cf0dbe71b788b2e0b60770e0af#023753b7dd8982cf0dbe71b788b2e0b60770e0af"
+source = "git+https://github.com/mayocream/tauri?rev=2908dbbbb7ea0c9aaf30a0e33c819a7eba092278#2908dbbbb7ea0c9aaf30a0e33c819a7eba092278"
 dependencies = [
  "anyhow",
  "glob",
@@ -8981,7 +8983,7 @@ dependencies = [
 [[package]]
 name = "tauri-runtime"
 version = "2.11.3"
-source = "git+https://github.com/mayocream/tauri?rev=023753b7dd8982cf0dbe71b788b2e0b60770e0af#023753b7dd8982cf0dbe71b788b2e0b60770e0af"
+source = "git+https://github.com/mayocream/tauri?rev=2908dbbbb7ea0c9aaf30a0e33c819a7eba092278#2908dbbbb7ea0c9aaf30a0e33c819a7eba092278"
 dependencies = [
  "cookie",
  "dpi",
@@ -9002,7 +9004,7 @@ dependencies = [
 [[package]]
 name = "tauri-runtime-cef"
 version = "0.1.0"
-source = "git+https://github.com/mayocream/tauri?rev=023753b7dd8982cf0dbe71b788b2e0b60770e0af#023753b7dd8982cf0dbe71b788b2e0b60770e0af"
+source = "git+https://github.com/mayocream/tauri?rev=2908dbbbb7ea0c9aaf30a0e33c819a7eba092278#2908dbbbb7ea0c9aaf30a0e33c819a7eba092278"
 dependencies = [
  "base64 0.22.1",
  "cef",
@@ -9032,13 +9034,14 @@ dependencies = [
  "url",
  "windows 0.61.3",
  "winit",
+ "winit-appkit",
  "x11-dl",
 ]
 
 [[package]]
 name = "tauri-runtime-wry"
 version = "2.11.4"
-source = "git+https://github.com/mayocream/tauri?rev=023753b7dd8982cf0dbe71b788b2e0b60770e0af#023753b7dd8982cf0dbe71b788b2e0b60770e0af"
+source = "git+https://github.com/mayocream/tauri?rev=2908dbbbb7ea0c9aaf30a0e33c819a7eba092278#2908dbbbb7ea0c9aaf30a0e33c819a7eba092278"
 dependencies = [
  "gtk",
  "http 1.5.0",
@@ -9095,7 +9098,7 @@ dependencies = [
 [[package]]
 name = "tauri-utils"
 version = "2.9.3"
-source = "git+https://github.com/mayocream/tauri?rev=023753b7dd8982cf0dbe71b788b2e0b60770e0af#023753b7dd8982cf0dbe71b788b2e0b60770e0af"
+source = "git+https://github.com/mayocream/tauri?rev=2908dbbbb7ea0c9aaf30a0e33c819a7eba092278#2908dbbbb7ea0c9aaf30a0e33c819a7eba092278"
 dependencies = [
  "anyhow",
  "brotli",
