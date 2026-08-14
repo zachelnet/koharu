@@ -2,6 +2,8 @@ use anyhow::{Result, bail};
 use koharu_runtime::{Backend, Device, Hardware};
 use koharu_torch::{Kind, nn};
 
+static CPU_FALLBACK_WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub(crate) trait TryIntoDevice<T> {
     fn try_into_device(self) -> Result<T>;
 }
@@ -10,7 +12,19 @@ impl TryIntoDevice<koharu_torch::Device> for Device {
     fn try_into_device(self) -> Result<koharu_torch::Device> {
         match self.backend {
             Backend::Cpu => Ok(koharu_torch::Device::Cpu),
-            Backend::Cuda | Backend::Rocm => Ok(koharu_torch::Device::Cuda(self.index)),
+            Backend::Cuda | Backend::Rocm => {
+                if koharu_torch::utils::has_cuda() || koharu_torch::utils::has_hip() {
+                    Ok(koharu_torch::Device::Cuda(self.index))
+                } else {
+                    if !CPU_FALLBACK_WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                        tracing::warn!(
+                            backend = %self.backend,
+                            "Torch was built without CUDA/HIP; falling back to CPU"
+                        );
+                    }
+                    Ok(koharu_torch::Device::Cpu)
+                }
+            }
             Backend::Vulkan if self.index == 0 => Ok(if koharu_torch::utils::has_vulkan() {
                 koharu_torch::Device::Vulkan
             } else {
