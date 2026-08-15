@@ -58,11 +58,19 @@ pub enum TextLayoutKind {
     Paragraph,
 }
 
-#[revisioned(revision = 1)]
+#[revisioned(revision = 2)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 pub struct TextLayout {
     pub origin: Origin,
     pub kind: TextLayoutKind,
+    #[revision(start = 2, default_fn = "default_angle_degrees")]
+    pub angle_degrees: f32,
+}
+
+impl TextLayout {
+    fn default_angle_degrees(_revision: u16) -> std::result::Result<f32, revision::Error> {
+        Ok(0.0)
+    }
 }
 
 impl Component for TextLayout {

@@ -511,6 +511,7 @@ fn write_region<'a>(
                     &TextLayout {
                         origin: Origin::Generated(generation.clone()),
                         kind: TextLayoutKind::Paragraph,
+                        angle_degrees: 0.0,
                     },
                 )?;
                 Ok((content, layer, true))
@@ -535,6 +536,7 @@ fn write_region<'a>(
             &TextLayout {
                 origin: Origin::Generated(generation.clone()),
                 kind: TextLayoutKind::Paragraph,
+                angle_degrees: 0.0,
             },
         )
         .context("failed to set detected text layout")?;
@@ -2083,6 +2085,7 @@ mod tests {
                     &TextLayout {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
+                        angle_degrees: 0.0,
                     },
                 )?;
                 link_dialogue_regions(

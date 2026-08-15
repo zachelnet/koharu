@@ -2,7 +2,7 @@ use std::{collections::HashSet, io::Cursor, path::PathBuf};
 
 use anyhow::{Context as _, Result, anyhow, bail};
 use image::{DynamicImage, ImageFormat, RgbaImage};
-use koharu_desktop::Frame;
+use koharu_desktop::{ElementTransform, Frame};
 use koharu_scene::{
     AssetInput, AssetMetadata, AssetRole, At, Authored, Commit, EntityId, EntityOrigin,
     Geometry as SceneGeometry, Group as SceneGroup, Origin, PageDraft, Point as ScenePoint,
@@ -426,6 +426,7 @@ impl Project {
                 &SceneTextLayout {
                     origin: Origin::User,
                     kind,
+                    angle_degrees: 0.0,
                 },
             )?;
             layer = Some(added_layer);
@@ -696,25 +697,34 @@ impl Project {
 
     pub(crate) async fn set_geometries(
         &mut self,
-        geometries: impl IntoIterator<Item = (EntityId, SceneGeometry)>,
+        transforms: impl IntoIterator<Item = ElementTransform>,
     ) -> Result<Commit> {
         let snapshot = self.snapshot();
-        let geometries = geometries
+        let transforms = transforms
             .into_iter()
-            .map(|(element, geometry)| {
-                if snapshot.component::<SceneTextLayout>(element)?.is_none() {
-                    bail!("only text layers can change geometry");
-                }
-                let content = Self::text_content(&snapshot, element)?;
-                Ok((element, geometry, content))
+            .map(|transform| {
+                let layout = snapshot
+                    .component::<SceneTextLayout>(transform.element)?
+                    .context("only text layers can change geometry")?;
+                let content = Self::text_content(&snapshot, transform.element)?;
+                Ok((
+                    transform.element,
+                    transform.geometry,
+                    transform.angle_degrees,
+                    layout,
+                    content,
+                ))
             })
             .collect::<Result<Vec<_>>>()?;
         let patch = snapshot.patch(|edit| {
-            for (element, mut geometry, content) in geometries {
+            for (element, mut geometry, angle_degrees, mut layout, content) in transforms {
                 edit.promote_entity_to_user(element)?;
                 edit.promote_entity_to_user(content)?;
                 geometry.origin = Origin::User;
+                layout.origin = Origin::User;
+                layout.angle_degrees = angle_degrees;
                 edit.set(element, &geometry)?;
+                edit.set(element, &layout)?;
             }
             Ok(())
         })?;

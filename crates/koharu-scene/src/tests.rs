@@ -102,7 +102,7 @@ async fn components_on_new_entities_do_not_observe_missing_base_state() {
 }
 
 #[tokio::test]
-async fn built_in_component_schemas_remain_revision_one() {
+async fn built_in_component_schemas_keep_expected_revisions() {
     fn schema<T: Component>() -> u16 {
         <T as revision::Revisioned>::revision()
     }
@@ -129,7 +129,7 @@ async fn built_in_component_schemas_remain_revision_one() {
             schema::<crate::components::Assets>(),
             schema::<Relation>(),
         ],
-        [1; 19]
+        [1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
 }
 
@@ -552,6 +552,7 @@ async fn text_analysis_content_and_presentation_have_distinct_ownership() {
                 &TextLayout {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
+                    angle_degrees: 0.0,
                 },
             )?;
             edit.relate::<RecognizedFrom>(content, region)?;
@@ -593,6 +594,7 @@ async fn text_group_owns_the_canonical_text_order() {
                 &TextLayout {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
+                    angle_degrees: 0.0,
                 },
             )?;
             let second_content = edit.add_text_content(page, At::End)?;
@@ -603,6 +605,7 @@ async fn text_group_owns_the_canonical_text_order() {
                 &TextLayout {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
+                    angle_degrees: 0.0,
                 },
             )?;
             ids = Some((page, first, second));
@@ -657,6 +660,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
             &TextLayout {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
+                angle_degrees: 0.0,
             },
         )?;
         edit.relate::<Presents>(layer, region)?;
@@ -675,6 +679,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
             &TextLayout {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
+                angle_degrees: 0.0,
             },
         )?;
         edit.relate::<Presents>(layer, second)?;
@@ -698,6 +703,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
             &TextLayout {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
+                angle_degrees: 0.0,
             },
         )?;
         edit.relate::<FitsTo>(layer, bubble)?;
@@ -727,6 +733,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
             &TextLayout {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
+                angle_degrees: 0.0,
             },
         )?;
         edit.relate::<FitsTo>(layer, text_region)?;
@@ -751,6 +758,7 @@ async fn typed_relations_enforce_endpoints_and_functional_cardinality() {
             &TextLayout {
                 origin: Origin::User,
                 kind: TextLayoutKind::Paragraph,
+                angle_degrees: 0.0,
             },
         )?;
         edit.relate::<FlowsIn>(layer, text_region)?;
@@ -775,6 +783,7 @@ async fn component_changes_cannot_invalidate_incident_typed_relations() {
                 &TextLayout {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
+                    angle_degrees: 0.0,
                 },
             )?);
             Ok(())
@@ -975,6 +984,7 @@ async fn independent_pipeline_components_rebase() {
                 &TextLayout {
                     origin: Origin::User,
                     kind: TextLayoutKind::Paragraph,
+                    angle_degrees: 0.0,
                 },
             )?;
             entities = Some((content, layer));

@@ -600,10 +600,14 @@ fn prepared_bounds(bounds: RenderBounds) -> PreparedBounds {
 }
 
 fn element_frame(layer: &Layer) -> Option<PreparedElementFrame> {
-    if !matches!(layer.kind(), LayerKind::Text(_)) {
+    let LayerKind::Text(metadata) = layer.kind() else {
         return None;
+    };
+    let mut frame = geometry_frame(layer.geometry())?;
+    if layer.geometry().points.len() != 4 {
+        frame.angle_degrees = metadata.angle_degrees;
     }
-    geometry_frame(layer.geometry())
+    Some(frame)
 }
 
 #[cfg(test)]

@@ -32,7 +32,8 @@ use crate::{
     Error, FontFamily, FontStyle, Frame, ImageKind, ImageMetadata, Layer, LayerKind, Presentation,
     RasterImage, RenderBounds, RenderDependency, RenderDiagnostic, Result, RetentionStats,
     TextAlign, TextMetadata, TypesettingConfig, WritingMode,
-    bubble::{GeometryFrame, LayoutBox, contour, flow_cells, geometry_bounds, geometry_frame},
+    bubble::{GeometryFrame, LayoutBox, contour, flow_cells, geometry_bounds, geometry_frame,
+        geometry_is_rectangle},
     fonts::{FontPreview, FontRequest, Fonts},
     frame::{
         FrameData, ImageNodeDescriptor, LayerData, LocalTextMetadata, NodeDescriptor, RetainedNode,
@@ -771,6 +772,16 @@ impl Traversal<'_> {
         let (geometry, frame, balloon_contour) = if let Some(geometry) = authored {
             let Some(frame) = geometry_frame(&geometry) else {
                 return Ok(None);
+            };
+            // Contour geometry (e.g. a bubble) cannot encode rotation in its points;
+            // use the layout angle instead.
+            let frame = if geometry_is_rectangle(&geometry) {
+                frame
+            } else {
+                GeometryFrame {
+                    angle_degrees: layout.angle_degrees,
+                    ..frame
+                }
             };
             let balloon = placement
                 .as_ref()
@@ -1675,8 +1686,8 @@ mod tests {
     use std::{collections::BTreeMap, io::Cursor};
 
     use koharu_scene::{
-        AssetInput, AssetMetadata, At, Authored, BubbleRegion, PageDraft, Session, SourceText,
-        TextLayout as SceneTextLayout, TextLayoutKind,
+        AssetInput, AssetMetadata, At, Authored, BubbleRegion, PageDraft, Point, Session,
+        SourceText, TextLayout as SceneTextLayout, TextLayoutKind,
     };
 
     use super::*;
@@ -1754,6 +1765,7 @@ mod tests {
                     &SceneTextLayout {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
+                        angle_degrees: 0.0,
                     },
                 )?;
                 edit.set(text, &Geometry::rectangle(10.0, 10.0, 80.0, 40.0))?;
@@ -1846,6 +1858,7 @@ mod tests {
                     &SceneTextLayout {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
+                        angle_degrees: 0.0,
                     },
                 )?;
                 edit.set(first, &Geometry::rectangle(10.0, 10.0, 80.0, 40.0))?;
@@ -1871,6 +1884,7 @@ mod tests {
                     &SceneTextLayout {
                         origin: Origin::User,
                         kind: TextLayoutKind::Paragraph,
+                        angle_degrees: 0.0,
                     },
                 )?;
                 edit.set(second, &Geometry::rectangle(100.0, 10.0, 80.0, 40.0))?;
@@ -1976,6 +1990,7 @@ mod tests {
                         &SceneTextLayout {
                             origin: Origin::User,
                             kind: TextLayoutKind::Paragraph,
+                            angle_degrees: 0.0,
                         },
                     )?;
                     edit.relate::<RecognizedFrom>(content, region)?;
@@ -2110,6 +2125,201 @@ mod tests {
                 opacity: 1.0,
             }
         );
+    }
+
+    fn rotated_geometry(width: f64, height: f64, center: (f64, f64), angle_degrees: f64) -> Geometry {
+        let (sin, cos) = angle_degrees.to_radians().sin_cos();
+        let (half_width, half_height) = (width * 0.5, height * 0.5);
+        Geometry {
+            origin: Origin::User,
+            points: [
+                (-half_width, -half_height),
+                (half_width, -half_height),
+                (half_width, half_height),
+                (-half_width, half_height),
+            ]
+            .map(|(x, y)| Point {
+                x: center.0 + x * cos - y * sin,
+                y: center.1 + x * sin + y * cos,
+            })
+            .into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn rotated_text_geometry_updates_the_placement() {
+        let mut session = Session::memory().await.unwrap();
+        let mut ids = None;
+        let create = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 200.0, 120.0), At::End)?;
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &SourceText {
+                        text: Authored::user("source".to_owned()),
+                        language: None,
+                    },
+                )?;
+                edit.set(
+                    content,
+                    &Translation {
+                        text: Authored::user("rotation".to_owned()),
+                        language: None,
+                    },
+                )?;
+                let text = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &SceneTextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: 0.0,
+                    },
+                )?;
+                edit.set(text, &Geometry::rectangle(10.0, 10.0, 80.0, 40.0))?;
+                ids = Some((page, text));
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(create).await.unwrap().snapshot;
+        let (page, text) = ids.unwrap();
+        let renderer = Renderer::default();
+        let first = renderer.render(&snapshot, page).await.unwrap();
+        let first_coeffs = first.layer(text).unwrap().placement().as_coeffs();
+        assert!(
+            (first_coeffs[0] - 1.0).abs() < 1e-6 && first_coeffs[1].abs() < 1e-6,
+            "unrotated placement was {first_coeffs:?}"
+        );
+
+        let rotate = snapshot
+            .patch(|edit| edit.set(text, &rotated_geometry(80.0, 40.0, (50.0, 30.0), 30.0)))
+            .unwrap();
+        let commit = session.commit(rotate).await.unwrap();
+        let updated = renderer
+            .update(&first, &commit.snapshot, &commit.changes)
+            .await
+            .unwrap();
+        let layer = updated.layer(text).unwrap();
+        let coeffs = layer.placement().as_coeffs();
+        let expected = 30.0_f64.to_radians();
+        assert!(
+            (coeffs[0] - expected.cos()).abs() < 1e-4,
+            "placement cos was {}",
+            coeffs[0]
+        );
+        assert!(
+            (coeffs[1] - expected.sin()).abs() < 1e-4,
+            "placement sin was {}",
+            coeffs[1]
+        );
+        assert!((layer.element_frame().unwrap().angle_degrees - 30.0).abs() < 1e-3);
+    }
+
+    fn contour_geometry(center: (f64, f64), radius_x: f64, radius_y: f64, angle_degrees: f64) -> Geometry {
+        let (sin, cos) = angle_degrees.to_radians().sin_cos();
+        Geometry {
+            origin: Origin::User,
+            points: (0..8)
+                .map(|index| {
+                    let angle = index as f64 * std::f64::consts::TAU / 8.0;
+                    let x = angle.cos() * radius_x;
+                    let y = angle.sin() * radius_y;
+                    Point {
+                        x: center.0 + x * cos - y * sin,
+                        y: center.1 + x * sin + y * cos,
+                    }
+                })
+                .collect(),
+        }
+    }
+
+    #[tokio::test]
+    async fn rotated_contour_text_uses_the_layout_angle() {
+        let mut session = Session::memory().await.unwrap();
+        let mut ids = None;
+        let create = session
+            .snapshot()
+            .patch(|edit| {
+                let page = edit.add_page(PageDraft::new("page", 200.0, 120.0), At::End)?;
+                let content = edit.add_text_content(page, At::End)?;
+                edit.set(
+                    content,
+                    &SourceText {
+                        text: Authored::user("source".to_owned()),
+                        language: None,
+                    },
+                )?;
+                edit.set(
+                    content,
+                    &Translation {
+                        text: Authored::user("contour".to_owned()),
+                        language: None,
+                    },
+                )?;
+                let text = edit.add_text_layer(
+                    page,
+                    At::End,
+                    content,
+                    &SceneTextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: 0.0,
+                    },
+                )?;
+                edit.set(text, &contour_geometry((100.0, 60.0), 40.0, 20.0, 0.0))?;
+                ids = Some((page, text));
+                Ok(())
+            })
+            .unwrap();
+        let snapshot = session.commit(create).await.unwrap().snapshot;
+        let (page, text) = ids.unwrap();
+        let renderer = Renderer::default();
+        let first = renderer.render(&snapshot, page).await.unwrap();
+        let first_coeffs = first.layer(text).unwrap().placement().as_coeffs();
+        assert!(
+            (first_coeffs[0] - 1.0).abs() < 1e-6 && first_coeffs[1].abs() < 1e-6,
+            "unrotated contour placement was {first_coeffs:?}"
+        );
+
+        let rotate = snapshot
+            .patch(|edit| {
+                edit.set(
+                    text,
+                    &contour_geometry((100.0, 60.0), 40.0, 20.0, 30.0),
+                )?;
+                edit.set(
+                    text,
+                    &SceneTextLayout {
+                        origin: Origin::User,
+                        kind: TextLayoutKind::Paragraph,
+                        angle_degrees: 30.0,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let commit = session.commit(rotate).await.unwrap();
+        let updated = renderer
+            .update(&first, &commit.snapshot, &commit.changes)
+            .await
+            .unwrap();
+        let layer = updated.layer(text).unwrap();
+        let coeffs = layer.placement().as_coeffs();
+        let expected = 30.0_f64.to_radians();
+        assert!(
+            (coeffs[0] - expected.cos()).abs() < 1e-4,
+            "contour placement cos was {}",
+            coeffs[0]
+        );
+        assert!(
+            (coeffs[1] - expected.sin()).abs() < 1e-4,
+            "contour placement sin was {}",
+            coeffs[1]
+        );
+        assert!((layer.element_frame().unwrap().angle_degrees - 30.0).abs() < 1e-3);
     }
 
     #[tokio::test]

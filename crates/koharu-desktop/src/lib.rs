@@ -36,6 +36,13 @@ pub struct TransformFrame {
     pub frame: Frame,
 }
 
+#[derive(Clone, Debug)]
+pub struct ElementTransform {
+    pub element: EntityId,
+    pub geometry: Geometry,
+    pub angle_degrees: f32,
+}
+
 #[derive(Clone, Debug, Serialize, Type)]
 pub struct CanvasState {
     pub page: Option<EntityId>,
@@ -235,7 +242,7 @@ impl Desktop {
         &self,
         expected_revision: Revision,
         elements: &[TransformFrame],
-    ) -> Result<Vec<(EntityId, Geometry)>> {
+    ) -> Result<Vec<ElementTransform>> {
         let presentation = self.presentation.read();
         let rendered = presentation
             .frame
@@ -293,7 +300,11 @@ impl Desktop {
                     .collect(),
             };
             if geometry != *layer.geometry() {
-                geometries.push((element.element, geometry));
+                geometries.push(ElementTransform {
+                    element: element.element,
+                    geometry,
+                    angle_degrees: element.frame.angle_degrees,
+                });
             }
         }
         Ok(geometries)
@@ -546,7 +557,9 @@ mod tests {
 
     use tokio::{sync::Notify, time::timeout};
 
-    use super::Desktop;
+    use koharu_scene::Point;
+
+    use super::{Desktop, Frame, frame_transform, transform_point};
 
     #[tokio::test]
     async fn newer_request_preempts_current_preparation_and_acquires_ownership() {
@@ -589,5 +602,74 @@ mod tests {
         assert_eq!(desktop.canvas_state().generation, 0);
         assert!(desktop.replace_frame_if_current(latest, None));
         assert_eq!(desktop.canvas_state().generation, 1);
+    }
+
+    fn box_corners(width: f64, height: f64) -> [Point; 4] {
+        [
+            Point { x: 0.0, y: 0.0 },
+            Point { x: width, y: 0.0 },
+            Point { x: width, y: height },
+            Point { x: 0.0, y: height },
+        ]
+    }
+
+    fn reconstructed_angle(points: &[Point]) -> f64 {
+        let top = (points[1].x - points[0].x, points[1].y - points[0].y);
+        top.1.atan2(top.0).to_degrees()
+    }
+
+    #[test]
+    fn rotation_transform_preserves_the_preview_angle() {
+        let original = Frame {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 50.0,
+            angle_degrees: 0.0,
+        };
+        let preview = Frame {
+            angle_degrees: 30.0,
+            ..original
+        };
+        let coefficients = frame_transform(original, preview);
+        let points: Vec<Point> = box_corners(100.0, 50.0)
+            .iter()
+            .map(|point| transform_point(coefficients, point))
+            .collect();
+        assert!(
+            (reconstructed_angle(&points) - 30.0).abs() < 1e-4,
+            "angle was {}",
+            reconstructed_angle(&points)
+        );
+    }
+
+    #[test]
+    fn chained_rotation_transform_accumulates_the_angle() {
+        let first = Frame {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 50.0,
+            angle_degrees: 0.0,
+        };
+        let second = Frame {
+            angle_degrees: 30.0,
+            ..first
+        };
+        let third = Frame {
+            angle_degrees: 60.0,
+            ..first
+        };
+        let coefficients = frame_transform(second, third);
+        let points: Vec<Point> = box_corners(100.0, 50.0)
+            .iter()
+            .map(|point| transform_point(frame_transform(first, second), point))
+            .map(|point| transform_point(coefficients, &point))
+            .collect();
+        assert!(
+            (reconstructed_angle(&points) - 60.0).abs() < 1e-4,
+            "angle was {}",
+            reconstructed_angle(&points)
+        );
     }
 }
