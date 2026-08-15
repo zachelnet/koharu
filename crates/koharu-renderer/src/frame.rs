@@ -600,18 +600,8 @@ fn prepared_bounds(bounds: RenderBounds) -> PreparedBounds {
 }
 
 fn element_frame(layer: &Layer) -> Option<PreparedElementFrame> {
-    let LayerKind::Text(text) = layer.kind() else {
+    if !matches!(layer.kind(), LayerKind::Text(_)) {
         return None;
-    };
-    let bounds = text.rendered_bounds;
-    if bounds.width > 0.0 && bounds.height > 0.0 {
-        return Some(PreparedElementFrame {
-            x: bounds.x,
-            y: bounds.y,
-            width: bounds.width,
-            height: bounds.height,
-            angle_degrees: text.angle_degrees,
-        });
     }
     geometry_frame(layer.geometry())
 }
