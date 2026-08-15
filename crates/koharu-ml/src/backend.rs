@@ -52,8 +52,10 @@ impl TryIntoDevice<koharu_torch::Device> for Device {
 
 pub(crate) fn set_precision(var_store: &mut nn::VarStore) {
     let device = var_store.device();
-    let hardware = Hardware::discover();
     let kind = if let koharu_torch::Device::Cuda(_) = device {
+        // Discovery probes CUDA/HIP/Vulkan, so only run it when the model
+        // actually runs on an accelerator.
+        let hardware = Hardware::discover();
         // ROCm: FP16 overflows and corrupts output.
         if hardware.supports_rocm() {
             if hardware.rocm_supports_bf16() {
